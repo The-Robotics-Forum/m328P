@@ -1,9 +1,12 @@
-
-
-void pinMode(uint8_t pin, uint8_t mode)
+void pinMode(uint8_t , uint8_t );
+static void turnOffPWM(uint8_t );
+void digitalWrite(uint8_t , uint8_t );
+int digitalRead(uint8_t );
+	
+void pinMode(uint8_t pIn, uint8_t mOde)
 {
-	uint8_t bit = digitalPinToBitMask(pin);
-	uint8_t port = digitalPinToPort(pin);
+	uint8_t bit = digitalPinToBitMask(pIn);
+	uint8_t port = digitalPinToPort(pIn);
 	volatile uint8_t *reg, *out;
 
 	if (port == NOT_A_PIN) return;
@@ -12,13 +15,13 @@ void pinMode(uint8_t pin, uint8_t mode)
 	reg = portModeRegister(port);
 	out = portOutputRegister(port);
 
-	if (mode == INPUT) { 
+	if (mOde == INPUT) { 
 		uint8_t oldSREG = SREG;
                 cli();
 		*reg &= ~bit;
 		*out &= ~bit;
 		SREG = oldSREG;
-	} else if (mode == INPUT_PULLUP) {
+	} else if (mOde == INPUT_PULLUP) {
 		uint8_t oldSREG = SREG;
                 cli();
 		*reg &= ~bit;
@@ -33,9 +36,9 @@ void pinMode(uint8_t pin, uint8_t mode)
 }
 
 
-static void turnOffPWM(uint8_t timer)
+static void turnOffPWM(uint8_t tImer)
 {
-	switch (timer)
+	switch (tImer)
 	{
 		#if defined(TCCR1A) && defined(COM1A1)
 		case TIMER1A:   cbi(TCCR1A, COM1A1);    break;
@@ -96,25 +99,25 @@ static void turnOffPWM(uint8_t timer)
 	}
 }
 
-void digitalWrite(uint8_t pin, uint8_t val)
+void digitalWrite(uint8_t pIn, uint8_t vAl)
 {
-	uint8_t timer = digitalPinToTimer(pin);
-	uint8_t bit = digitalPinToBitMask(pin);
-	uint8_t port = digitalPinToPort(pin);
+	uint8_t tImer = digitalPinToTimer(pIn);
+	uint8_t bit = digitalPinToBitMask(pIn);
+	uint8_t port = digitalPinToPort(pIn);
 	volatile uint8_t *out;
 
 	if (port == NOT_A_PIN) return;
 
 	// If the pin that support PWM output, we need to turn it off
 	// before doing a digital write.
-	if (timer != NOT_ON_TIMER) turnOffPWM(timer);
+	if (tImer != NOT_ON_TIMER) turnOffPWM(tImer);
 
 	out = portOutputRegister(port);
 
 	uint8_t oldSREG = SREG;
 	cli();
 
-	if (val == LOW) {
+	if (vAl == LOW) {
 		*out &= ~bit;
 	} else {
 		*out |= bit;
@@ -123,17 +126,17 @@ void digitalWrite(uint8_t pin, uint8_t val)
 	SREG = oldSREG;
 }
 
-int digitalRead(uint8_t pin)
+int digitalRead(uint8_t pIn)
 {
-	uint8_t timer = digitalPinToTimer(pin);
-	uint8_t bit = digitalPinToBitMask(pin);
-	uint8_t port = digitalPinToPort(pin);
+	uint8_t tImer = digitalPinToTimer(pIn);
+	uint8_t bit = digitalPinToBitMask(pIn);
+	uint8_t port = digitalPinToPort(pIn);
 
 	if (port == NOT_A_PIN) return LOW;
 
 	// If the pin that support PWM output, we need to turn it off
 	// before getting a digital reading.
-	if (timer != NOT_ON_TIMER) turnOffPWM(timer);
+	if (tImer != NOT_ON_TIMER) turnOffPWM(tImer);
 
 	if (*portInputRegister(port) & bit) return HIGH;
 	return LOW;
