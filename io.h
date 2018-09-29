@@ -212,10 +212,6 @@ const uint8_t PROGMEM digital_pin_to_bit_mask_PGM[] = {
 	_BV(4),
 	_BV(5),
 };
-
-
-
-
 unsigned long microsecondsToInches(unsigned long mIcroseconds) 
 {
   // According to Parallax's datasheet for the PING))), there are 73.746
@@ -233,69 +229,59 @@ unsigned long microsecondsToCentimeters(unsigned long microseconds)
   return (microseconds*0.17/ 2);
 }
 
-unsigned long pulseIn(volatile uint8_t pInno, uint8_t vAlue)
+double pulseIn(volatile uint8_t pInno, uint8_t vAlue)
 {
-  TCCR2A = (1 << WGM21) | (1 << COM2A1) | (1 << FOC2A) | (0 << COM2A0) | (0 << WGM20); //initializing in CTC mode
-  TCCR2A = (1 << CS20);
+  TCCR2A = (1 << WGM21)|(1 << COM2A1)|(0 << COM2A0)|(0 << WGM20); //initializing in CTC mode
+  TCCR2B = (1 << CS20)|(1<<FOC2A);
   unsigned long mAxloops = 500000;
   unsigned long wIdth = 0;
   // wait for any previous pulse to end
-  while (((PIND) && (pInno)) == vAlue)
+  while ( ((PIND)&&(pInno)) == vAlue)//remove PIND. It should be for every register.
 	  {
 		if (--mAxloops == 0)
-		return 0;
+		  return 0;
 	  }
   // wait for the pulse to start  
-  while (((PIND) && (pInno)) != vAlue)
+  while ( ((PIND)&&(pInno)) != vAlue)
 	  {
 		if (--mAxloops == 0)
 		return 0;
 	  }
   // wait for the pulse to stop
-  while (((PIND) && (pInno)) == vAlue)
+  while ( ((PIND)&&(pInno)) == vAlue)
 	  {
 		if (++wIdth == mAxloops)
-		return 0;
-	   }
+		  return 0;
+	  }
   return wIdth;
 }
 
 class Serial
+{       public:
+	void uart_initialise(void)
 {
-	public:
-	void start( unsigned int uBrr){
-		/*Set baud rate */
-		UBRR0H = (unsigned char)(uBrr>>8);
-		UBRR0L = (unsigned char)uBrr;
-		/*Enable receiver and transmitter */
-		UCSR0B = (1<<RXEN0)|(1<<TXEN0);
-	}
-	/* Set frame format: 8data, 2stop bit */
-	void send( unsigned char data ){
-		/* Wait for empty transmit buffer */
-		while ( !( UCSR0A & (1<<UDRE0)) )
-		;
-		/* Put data into buffer, sends the data */
-		UDR0 = data;
-		_delay_ms(100);
-	}
-	unsigned char get( void ){
-		/* Wait for data to be received */
-		while ( !(UCSR0A & (1<<RXC0)) )
-		;
-		/* Get and return received data from buffer */
-		return UDR0;
-	}
-	void flush(void){
-		unsigned char dUmmy;
-		while ( UCSR0A & (1<<RXC0) ) dUmmy = UDR0;
-	}
-
-	void end(void){
-		flush();
-		UCSR0B&=0xe7;	//disabling RXEN & TXEN
-	}
-
+	UBRR0H = 0; (BaudRate >> 8);
+	UBRR0L = BaudRate;
+	UCSR0B = (1 << TXEN0) | (1 << RXEN0);
+	UCSR0C =(1 << USBS0) | (3 << UCSZ00); //UCSR0C= (1<<URSEL)|(1<<UCSZ00)|(1<<UCSZ01); 0b00001110;
+}
+unsigned char uart_receive(void)
+{
+	while (!(UCSR0A & (1 << RXC0)))
+	;
+	return UDR0;
+}
+void uart_transmit(unsigned char data)
+{
+	while(!(UCSR0A & (1<<UDRE0)))
+	UDR0=data;
+}
+void uart_flush(void)
+{
+	unsigned char dummy;
+	while ( UCSR0A & (1 << RXC0))
+	dummy= UDR0;
+}
 };
 
 class Serial1
@@ -455,193 +441,58 @@ double constrain(double nUm,double uPper,double lOwer)
 	else 
 	return nUm;	
 }
-void attachIntterupt(int pIn, void (*iSrfunc)(void), int cOmpare)		//cOmpare:LOW=0,HIGH1,RISING=2,FALLING=3
+void attachInterrupt(int intpin, void (*isrfunc)(void), int compare)		//cOmpare:LOW=0,HIGH1,RISING=2,FALLING=3
 {
 	sei();
-	cAllisr=iSrfunc;
-	switch(pIn)	  //enabling interrupt pin
+	callisr=isrfunc;
+	switch(intpin)	  //enabling interrupt pin
 	{
 		case 0:
-		EIMSK|=1<<INT0;
-		switch(cOmpare){
+		EIMSK= 1<<INT0;
+		switch(compare)
+		{
 			case 2:
-			EICRA|=(1<<ISC00)|(1<<ISC01);
+			MCUCR|=(1<<ISC00)|(1<<ISC01);
 			break;
 			case 3:
-			EICRA|=(0<<ISC00)|(1<<ISC01);
+	    	        MCUCR|=(0<<ISC00)|(1<<ISC01);
 			break;
 			case 4:
-			EICRA|=(1<<ISC00)|(0<<ISC01);
+			MCUCR|=(1<<ISC00)|(0<<ISC01);
 			break;
-			default:
-			EICRA|=(0<<ISC00)|(0<<ISC01);
+         	default:
+			MCUCR|=(0<<ISC00)|(0<<ISC01);	
 		}
 		break;
-
 		case 1:
 		EIMSK|=1<<INT1;
-                switch(cOmpare)
+		switch(compare)
 		{
 			case 2:
-			EICRA|=(1<<ISC10)|(1<<ISC11);
+			MCUCR|=(1<<ISC10)|(1<<ISC11);
 			break;
 			case 3:
-			EICRA=(0<<ISC10)|(1<<ISC11);
+			MCUCR|=(0<<ISC10)|(1<<ISC11);
 			break;
-			case 4:
-			EICRA|=(1<<ISC10)|(0<<ISC11);
+         	case 4:
+			MCUCR|=(1<<ISC10)|(0<<ISC11);
 			break;
-			default:
-			EICRA|=(0<<ISC10)|(0<<ISC11);
+        	default:
+			MCUCR|=(0<<ISC00)|(0<<ISC01);
 		}
 		break;
-		
-		case 2:
-		EIMSK|=1<<INT2;
-		switch(cOmpare)
-		{
-			case 2:
-			EICRA|=(1<<ISC20)|(1<<ISC21);
-			break;
-			case 3:
-			EICRA=(0<<ISC20)|(1<<ISC21);
-			break;
-			case 4:
-			EICRA|=(1<<ISC20)|(0<<ISC21);
-			break;
-			default:
-			EICRA|=(0<<ISC20)|(0<<ISC21);
-		}
-		break;
-		
-		case 3:
-		EIMSK|=1<<INT3;
-		switch(cOmpare)
-		{
-			case 2:
-			EICRA|=(1<<ISC30)|(1<<ISC31);
-			break;
-			case 3:
-			EICRA=(0<<ISC30)|(1<<ISC31);
-			break;
-			case 4:
-			EICRA|=(1<<ISC30)|(0<<ISC31);
-			break;
-			default:
-			EICRA|=(0<<ISC30)|(0<<ISC31);
-		}
-		break;
-		
-		case 4:
-		EIMSK|=1<<INT4;
-                switch(cOmpare)
-		{
-			case 2:
-			EICRB|=(1<<ISC40)|(1<<ISC41);
-			break;
-			case 3:
-			EICRB=(0<<ISC40)|(1<<ISC41);
-			break;
-			case 4:
-			EICRB|=(1<<ISC40)|(0<<ISC41);
-			break;
-			default:
-			EICRB|=(0<<ISC40)|(0<<ISC41);
-		}
-		break;
-		
-		case 5:
-		EIMSK|=1<<INT5;
-		switch(cOmpare)
-		{
-			case 2:
-			EICRB|=(1<<ISC50)|(1<<ISC51);
-			break;
-			case 3:
-			EICRB=(0<<ISC50)|(1<<ISC51);
-			break;
-			case 4:
-			EICRB|=(1<<ISC50)|(0<<ISC51);
-			break;
-			default:
-                 	EICRB|=(0<<ISC40)|(0<<ISC41);
-			
-		}
-		break;
-		
-		case 6:
-		EIMSK|=1<<INT6;
-	        switch(cOmpare)
-		{
-			case 2:
-			EICRB|=(1<<ISC60)|(1<<ISC61);
-			break;
-			case 3:
-			EICRB=(0<<ISC60)|(1<<ISC61);
-			break;
-			case 4:
-			EICRB|=(1<<ISC60)|(0<<ISC61);
-			break;
-			default:
-			EICRB|=(0<<ISC60)|(0<<ISC61);
-			
-		}
-		break;
-		
-		case 7:
-		EIMSK|=1<<INT7;
-		switch(cOmpare)
-		{
-			case 2:
-			EICRB|=(1<<ISC70)|(1<<ISC71);
-			break;
-			case 3:
-			EICRB=(0<<ISC70)|(1<<ISC71);
-			break;
-			case 4:
-			EICRB|=(1<<ISC70)|(0<<ISC71);
-			break;
-			default:
-			EICRB|=(0<<ISC70)|(0<<ISC71);
-		}
-		break;
-		
-	        default:EICRA|=(0<<ISC01)|(0<<ISC00);
-	}
+		default:
+		MCUCR|=(0<<ISC00)|(0<<ISC01);	
+	}	
 }
 ISR(INT0_vect)
 {
-   cAllisr();
+	callisr();
 }
 ISR(INT1_vect)
 {
-   cAllisr();
+	callisr();
 }
-ISR(INT2_vect)
-{
-   cAllisr();
-}
-ISR(INT3_vect)
-{
-   cAllisr();
-}
-ISR(INT4_vect)
-{
-    cAllisr();
-}
-ISR(INT5_vect)
-{
-    cAllisr();
-}
-ISR(INT6_vect)
-{
-    cAllisr();
-}
-ISR(INT7_vect)
-{ 
-    cAllisr();
-}
-
 
 
 
