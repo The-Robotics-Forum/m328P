@@ -21,8 +21,6 @@ double map(double,double,double,double,double);
 double constrain(double,double,double);
 void attachIntterupt(int, void *,int);
 void (*cAllisr)(void); //function pointer used in ISR()
-
-
 void pinMode(uint8_t , uint8_t );
 static void turnOffPWM(uint8_t );
 void digitalWrite(uint8_t , uint8_t );
@@ -258,25 +256,25 @@ double pulseIn(volatile uint8_t pInno, uint8_t vAlue)
 
 class Serial
 {       public:
-	void uart_initialise(void)
+	void start(void)
 {
 	UBRR0H = 0; (BaudRate >> 8);
 	UBRR0L = BaudRate;
 	UCSR0B = (1 << TXEN0) | (1 << RXEN0);
 	UCSR0C =(1 << USBS0) | (3 << UCSZ00); //UCSR0C= (1<<URSEL)|(1<<UCSZ00)|(1<<UCSZ01); 0b00001110;
 }
-unsigned char uart_receive(void)
+unsigned char get(void)
 {
 	while (!(UCSR0A & (1 << RXC0)))
 	;
 	return UDR0;
 }
-void uart_transmit(unsigned char data)
+void send(unsigned char data)
 {
 	while(!(UCSR0A & (1<<UDRE0)))
 	UDR0=data;
 }
-void uart_flush(void)
+void flush(void)
 {
 	unsigned char dummy;
 	while ( UCSR0A & (1 << RXC0))
@@ -322,90 +320,39 @@ class Serial1
 	}
 
 };
-void initADC()
-{
-	ADMUX=(1<<REFS0);				//Aref=AVcc
-	ADCSRA=(1<<ADEN)|(1<<ADPS2)|(1<<ADPS1);		//ADC enabled, Prescaler 64
-}
-
-int analogRead(int PiNNo)
-{
-        //prescalar set to default
-  	ADMUX=(1<<REFS0)|(0<<REFS1);
-  	ADCSRA|=(1<<ADEN);
-        ADMUX|=x;//chose value from 0 to 7 to chose adc pin accordingly
-        ADCSRA|=(1<<ADEN);
-        ADCSRA|=(1<<ADSC);
+uint16_t analogRead(uint8_t cHannel)
+{  
+    ADMUX=(1<<REFS0);				//aref=AVcc
+	ADCSRA=(1<<ADEN)|(1<<ADPS2)|(1<<ADPS1);
+	ADMUX=(1<<REFS0)|(0<<REFS1);
+	ADCSRA|=(1<<ADEN);
+	ADMUX|=cHannel;  //choose value from 0 to 3 to chose adc pin accordingly
+	ADCSRA|=(1<<ADEN);
+	ADCSRA|=(1<<ADSC);
 	while(ADCSRA&(1<<ADSC));
 	return (ADC);
 }
-
-void analogWrite(uint8_t pInNo,uint8_t dUtycY)
+void analogWrite(int pIn,int dUtycycle)
 {
-  TCCR1B=(1<<CS11)|(1<<CS10);
-  TCCR1A=(1<<WGM10)|(1<<WGM12)|(1<<COM1A1)|(1<<COM1B1);
-	if(pInNo==1)
+	//initialize TCCR0 as per requirement, say as follows
+	TCCR1A |= (1<<WGM10)|(1<<COM1A1)|(1<<COM1B1);//initializing timer1
+	TCCR1B |=(1<<CS10);
+	TCNT1=0;
+	if(pIn==1)
 	{
-	  OCR1A=dUtycY;
+		OCR1A=dUtycycle;
 	}
-	if(pInNo==2)
+	else if(pIn==2)
 	{
-          OCR1B=dUtycY;
-	}
-}
-
-
-void Dmilli(int j)
-{ 
-	TCCR0A|=(1<<WGM01);
-	TCCR0A|=(1<<CS00);
-	TIMSK0|=(1<<OCIE0A);
-	OCR0A=255;
-	TCNT0=0;
-        long int x=31.50*j;
-        long int i;
-        for(i=0;i<x;i++)
-        {
-	  while(!(TIFR0 & (1 << OCF0A))) 
-          {
-          }
-          TIFR0|=(1<<OCF0A);
+		OCR1B=dUtycycle;
 	}
 }
-
-float x=0;
-int millis()
-{
-	float l;
-	l=x*0.16+0.00000625*TCNT0;
-        return l;
+float millis()//float and not int.
+{   int x;
+	float mIlli;
+	mIlli=x*0.16+0.00000625*TCNT0;
+	return mIlli;
 }
-
-void tinit(void)
-{ 
-	TCCR0A|=(1<<WGM01);
-        TCCR0A|=(1<<CS00);
-	TIMSK0|=(1<<TOV0);
-        TCNT0=0;
-}
-
-int main(void)			//WHAT IS THIS?
-{
-        tinit();
-        DDRB=0b1111111;
-	int y;
-	sei();
-	while (1)
-	{
-	 y=millis();
-	 PORTB=y;
- 	} 
-}
-
-ISR(TIMER0_OVF_vect)
-{
-	x++;	
-}	
 
 void delay(unsigned long mIllisec)
 {
@@ -416,7 +363,6 @@ void delay(unsigned long mIllisec)
 	}
 	return;
 }
-
 void delayMicroseconds(unsigned long mIcrosec)
 {
 	int i;
@@ -434,12 +380,9 @@ double map(double vAlue, double fromLow, double fromHigh, double toLow, double t
 
 double constrain(double nUm,double uPper,double lOwer)
 {
-	if(nUm<uPper){
-		return uPper;}
-	else if(nUm>lOwer){
-		return lOwer;}
-	else 
-	return nUm;	
+	if(nUm<uPper){return uPper;}
+	else if(nUm>lOwer){return lOwer;}
+	else return nUm;	
 }
 void attachInterrupt(int intpin, void (*isrfunc)(void), int compare)		//cOmpare:LOW=0,HIGH1,RISING=2,FALLING=3
 {
@@ -447,37 +390,37 @@ void attachInterrupt(int intpin, void (*isrfunc)(void), int compare)		//cOmpare:
 	callisr=isrfunc;
 	switch(intpin)	  //enabling interrupt pin
 	{
-		case 0:
+		case 0: //enabling INT0
 		EIMSK= 1<<INT0;
 		switch(compare)
 		{
-			case 2:
+	          	case 2: //RISING
 			MCUCR|=(1<<ISC00)|(1<<ISC01);
 			break;
-			case 3:
+			case 3: //FALLING
 	    	        MCUCR|=(0<<ISC00)|(1<<ISC01);
 			break;
-			case 4:
+			case 4: //CHANGE
 			MCUCR|=(1<<ISC00)|(0<<ISC01);
 			break;
-         	default:
+         	        default:
 			MCUCR|=(0<<ISC00)|(0<<ISC01);	
 		}
 		break;
-		case 1:
+		case 1: //enabling INT1
 		EIMSK|=1<<INT1;
 		switch(compare)
 		{
-			case 2:
+			case 2: //RISING
 			MCUCR|=(1<<ISC10)|(1<<ISC11);
 			break;
-			case 3:
+			case 3: //FALLING
 			MCUCR|=(0<<ISC10)|(1<<ISC11);
 			break;
-         	case 4:
+         	        case 4: //CHANGE
 			MCUCR|=(1<<ISC10)|(0<<ISC11);
 			break;
-        	default:
+        	        default:
 			MCUCR|=(0<<ISC00)|(0<<ISC01);
 		}
 		break;
@@ -493,8 +436,3 @@ ISR(INT1_vect)
 {
 	callisr();
 }
-
-
-
-
-
