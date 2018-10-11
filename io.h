@@ -280,46 +280,12 @@ void flush(void)
 	while ( UCSR0A & (1 << RXC0))
 	dummy= UDR0;
 }
-};
-
-class Serial1
+void end(void)
 {
-	public:
-	void start( unsigned int uBrr){
-		/*Set baud rate */
-		UBRR1H = (unsigned char)(uBrr>>8);
-		UBRR1L = (unsigned char)uBrr;
-		/*Enable receiver and transmitter */
-		UCSR1B = (1<<RXEN0)|(1<<TXEN0);
-	}
-	/* Set frame format: 8data, 2stop bit */
-	void send( unsigned char data ){
-		/* Wait for empty transmit buffer */
-		while ( !( UCSR1A & (1<<UDRE)) )
-		;
-		/* Put data into buffer, sends the data */
-		UDR1= data;
-		_delay_ms(100);
-	}
-	unsigned char get( void ){
-		/* Wait for data to be received */
-		while ( !(UCSR1A & (1<<RXC1)) )
-		;
-		/* Get and return received data from buffer */
-		return UDR1;
-	}
-	void flush(void){
-		unsigned char dUmmy;
-		while ( UCSR1A & (1<<RXC1) ) dUmmy = UDR1
-		;
-	}
-
-	void end(void){
-		flush();
-		UCSR1B&=0xe7;	//disabling RXEN & TXEN
-	}
-
+		UCSR0B|=(0<<RXEN0)|(0<<TXEN0);	//disabling RXEN & TXEN
+}
 };
+
 uint16_t analogRead(uint8_t cHannel)
 {  
     ADMUX=(1<<REFS0);				//aref=AVcc
